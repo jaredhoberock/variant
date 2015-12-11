@@ -7,6 +7,8 @@
 __host__ __device__
 void test()
 {
+  using namespace std::experimental;
+
   variant<char, int, float, double> v1;
   assert(v1.index() == 0);
 
