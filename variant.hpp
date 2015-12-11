@@ -488,19 +488,6 @@ class variant
     >::type storage_type;
 
     storage_type storage_;
-
-    __host__ __device__
-    void *data()
-    {
-      return &storage_;
-    }
-
-    __host__ __device__
-    const void *data() const
-    {
-      return &storage_;
-    }
-
     size_t index_;
 };
 
