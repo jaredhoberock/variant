@@ -3,6 +3,8 @@
 #include <type_traits>
 #include <iostream>
 #include <cassert>
+#include <stdexcept>
+#include <string>
 
 #ifndef __host__
 #  define __host__
@@ -155,6 +157,26 @@ struct __is_variant_alternative<T,variant<T1,Types...>>
       (tuple_find<T,T1,Types...>::value != variant_not_found)
     >
 {};
+
+
+class bad_variant_access : public std::logic_error
+{
+  public:
+    explicit bad_variant_access(const std::string& what_arg) : logic_error(what_arg) {}
+    explicit bad_variant_access(const char* what_arg) : logic_error(what_arg) {}
+};
+
+
+__host__ __device__
+void __throw_bad_variant_access(const char* what_arg)
+{
+#ifdef __CUDA_ARCH__
+  printf("bad_variant_access: %s\n", what_arg);
+  assert(0);
+#else
+  throw bad_variant_access(what_arg);
+#endif
+}
 
 
 template<typename T1, typename... Types>
@@ -679,7 +701,10 @@ __host__ __device__
 __variant_element_reference_t<i, variant<T1,Types...>&>
   get(variant<T1,Types...>& v)
 {
-  assert(i == v.index());
+  if(i != v.index())
+  {
+    __throw_bad_variant_access("i does not equal index()");
+  }
 
   using type = typename std::decay<
     variant_element_t<i,variant<T1,Types...>>
@@ -693,7 +718,10 @@ __host__ __device__
 __variant_element_reference_t<i, variant<T1,Types...>&&>
   get(variant<T1,Types...>&& v)
 {
-  assert(i == v.index());
+  if(i != v.index())
+  {
+    __throw_bad_variant_access("i does not equal index()");
+  }
 
   using type = typename std::decay<
     variant_element_t<i,variant<T1,Types...>>
@@ -707,7 +735,10 @@ __host__ __device__
 __variant_element_reference_t<i, const variant<T1,Types...>&>
   get(const variant<T1,Types...>& v)
 {
-  assert(i == v.index());
+  if(i != v.index())
+  {
+    __throw_bad_variant_access("i does not equal index()");
+  }
 
   using type = typename std::decay<
     variant_element_t<i,variant<T1,Types...>>
@@ -716,6 +747,36 @@ __variant_element_reference_t<i, const variant<T1,Types...>&>
   return *apply_visitor(__get_visitor<type>(), v);
 }
 
+
+template<size_t i, class... Types>
+struct __find_exactly_one_impl;
+
+template<size_t i, class T, class U, class... Types>
+struct __find_exactly_one_impl<i,T,U,Types...> : __find_exactly_one_impl<i+1,T,Types...> {};
+
+template<size_t i, class T, class... Types>
+struct __find_exactly_one_impl<i,T,T,Types...> : std::integral_constant<size_t, i>
+{
+  static_assert(__find_exactly_one_impl<i,T,Types...>::value == variant_not_found, "type can only occur once in type list");
+};
+
+template<size_t i, class T>
+struct __find_exactly_one_impl<i,T> : std::integral_constant<size_t, variant_not_found> {};
+
+template<class T, class... Types>
+struct __find_exactly_one : __find_exactly_one_impl<0,T,Types...>
+{
+  static_assert(__find_exactly_one::value != variant_not_found, "type not found in type list");
+};
+
+
+template<class T, class T1, class... Types>
+__host__ __device__
+bool holds_alternative(const variant<T1,Types...>& v)
+{
+  constexpr size_t i = __find_exactly_one<T,T1,Types...>::value;
+  return i == v.index();
+}
 
 #ifdef VARIANT_UNDEF_HOST
 #  undef __host__
