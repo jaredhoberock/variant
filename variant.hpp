@@ -15,34 +15,6 @@
 #endif
 
 
-template<size_t i, typename T1, typename... Types>
-  struct __initializer : __initializer<i+1,Types...>
-{
-  typedef __initializer<i+1,Types...> super_t;
-
-  using super_t::operator();
-
-  __host__ __device__
-  size_t operator()(void *ptr, const T1& other)
-  {
-    new (ptr) T1(other);
-    return i;
-  }
-};
-
-
-template<size_t i, typename T>
-struct __initializer<i,T>
-{
-  __host__ __device__
-  size_t operator()(void* ptr, const T& other)
-  {
-    new (ptr) T(other);
-    return i;
-  }
-};
-
-
 template<size_t i, size_t... js>
 struct __constexpr_max
 {
@@ -82,41 +54,6 @@ using variant_element_t = typename variant_element<i,Types...>::type;
 
 
 static constexpr const size_t variant_not_found = static_cast<size_t>(-1);
-
-//template<size_t index, typename T, typename T1, typename... Types>
-//struct __variant_find_impl;
-//
-//template<size_t index, typename T, typename T1, typename... Types>
-//struct __variant_find_impl<index,T,variant<T1,Types...>>
-//  : std::integral_constant<
-//      size_t,
-//      __variant_find_impl<index+1,T,variant<Types...>>::value
-//    >
-//{};
-//
-//template<size_t index, typename T, typename... Types>
-//struct __variant_find_impl<index,T,variant<T,Types...>>
-//  : std::integral_constant<
-//      size_t,
-//      index
-//    >
-//{};
-//
-//
-//template<size_t index, typename T, typename Type>
-//struct __variant_find_impl<index,T,variant<T,Type>>
-//  : std::integral_constant<
-//      size_t,
-//      variant_not_found
-//    >
-//{};
-//
-//template<typename T, typename Variant>
-//using variant_find = __variant_find_impl<0,T,Variant>;
-
-
-//template<typename T, typename Variant>
-//using __is_variant_alternative = std::integral_constant<bool, variant_find<T,Variant>::value != variant_not_found>;
 
 
 template<typename T, typename U>
@@ -178,34 +115,34 @@ auto apply_visitor(Visitor visitor, Variant1&& var1, Variant2&& var2) ->
 
 
 template<size_t i, typename T, typename... Types>
-struct __index_of_impl;
+struct __tuple_find_impl;
 
 
 // no match, keep going
 template<size_t i, typename T, typename U, typename... Types>
-struct __index_of_impl<i,T,U,Types...>
-  : __index_of_impl<i+1,T,Types...>
+struct __tuple_find_impl<i,T,U,Types...>
+  : __tuple_find_impl<i+1,T,Types...>
 {};
 
 
 // found a match
 template<size_t i, typename T, typename... Types>
-struct __index_of_impl<i,T,T,Types...>
+struct __tuple_find_impl<i,T,T,Types...>
 {
-  static const size_t value = i;
+  static constexpr const size_t value = i;
 };
 
 
 // no match
 template<size_t i, typename T>
-struct __index_of_impl<i,T>
+struct __tuple_find_impl<i,T>
 {
-  static const size_t value = variant_not_found;
+  static constexpr const size_t value = variant_not_found;
 };
 
 
 template<typename T, typename... Types>
-using __index_of = __index_of_impl<0,T,Types...>;
+using tuple_find = __tuple_find_impl<0,T,Types...>;
 
 
 template<typename T, typename Variant>
@@ -215,7 +152,7 @@ template<class T, class T1, class... Types>
 struct __is_variant_alternative<T,variant<T1,Types...>>
   : std::integral_constant<
       bool,
-      (__index_of<T,T1,Types...>::value != variant_not_found)
+      (tuple_find<T,T1,Types...>::value != variant_not_found)
     >
 {};
 
@@ -223,99 +160,114 @@ struct __is_variant_alternative<T,variant<T1,Types...>>
 template<typename T1, typename... Types>
 class variant
 {
-  private:
-    struct destroyer
-    {
-      template<typename T>
-      __host__ __device__
-      typename std::enable_if<
-        !std::is_pod<T>::value
-      >::type
-        operator()(T& x)
-      {
-        x.~T();
-      }
-    
-      template<typename T>
-      __host__ __device__
-      typename std::enable_if<
-        std::is_pod<T>::value
-      >::type
-        operator()(T& x)
-      {
-        // do nothing for POD types
-      }
-    };
-
   public:
     __host__ __device__
     variant() : variant(T1{}) {}
 
   private:
-    struct placement_mover
+    struct binary_move_construct_visitor
     {
-      void *ptr;
-
+      template<class T>
       __host__ __device__
-      placement_mover(void* p) : ptr(p) {}
-
-      template<typename U>
-      __host__ __device__
-      size_t operator()(U&& x)
+      void operator()(T& self, T&& other)
       {
-        // decay off the reference of U, if any
-        using T = typename std::decay<U>::type;
-        new (ptr) T(std::move(x));
-        return __index_of<T,T1,Types...>::value;
+        new (&self) T(std::move(other));
       }
+
+      template<class... Args>
+      __host__ __device__
+      void operator()(Args&&...){}
     };
 
   public:
     __host__ __device__
     variant(variant&& other)
-      : index_(apply_visitor(placement_mover(data()), std::move(other)))
-    {}
+      : index_(other.index())
+    {
+      apply_visitor(binary_move_construct_visitor(), *this, std::move(other));
+    }
 
   private:
-    struct placement_copier
+    struct binary_copy_construct_visitor
     {
-      void *ptr;
-
+      template<class T>
       __host__ __device__
-      placement_copier(void* p) : ptr(p) {}
-
-      template<typename U>
-      __host__ __device__
-      size_t operator()(U&& x)
+      void operator()(T& self, const T& other)
       {
-        // decay off the reference of U, if any
-        using T = typename std::decay<U>::type;
-        new (ptr) T(x);
-        return __index_of<T,T1,Types...>::value;
+        new (&self) T(other);
       }
+
+      template<class... Args>
+      __host__ __device__
+      void operator()(Args&&...){}
     };
 
   public:
     __host__ __device__
     variant(const variant& other)
-      : index_(apply_visitor(placement_copier(data()), other))
-    {}
+      : index_(other.index())
+    {
+      apply_visitor(binary_copy_construct_visitor(), *this, other);
+    }
 
+  private:
+    template<class T>
+    struct unary_copy_construct_visitor
+    {
+      const T& other;
+
+      __host__ __device__
+      void operator()(T& self)
+      {
+        new (&self) T(other);
+      }
+
+      template<class U>
+      __host__ __device__
+      void operator()(U&&) {}
+    };
+
+  public:
     template<typename T,
              class = typename std::enable_if<
                __is_variant_alternative<T,variant>::value
              >::type>
     __host__ __device__
     variant(const T& other)
+      : index_(tuple_find<T,T1,Types...>::value)
     {
-      __initializer<0, T1, Types...> init;
-      index_ = init(data(), other);
+      apply_visitor(unary_copy_construct_visitor<T>{other}, *this);
     }
 
+  private:
+    struct destruct_visitor
+    {
+      template<typename T>
+      __host__ __device__
+      typename std::enable_if<
+        !std::is_trivially_destructible<T>::value
+      >::type
+        operator()(T& x)
+      {
+        x.~T();
+      }
+      
+      template<typename T>
+      __host__ __device__
+      typename std::enable_if<
+        std::is_trivially_destructible<T>::value
+      >::type
+        operator()(T& x)
+      {
+        // omit invocations of destructors for trivially destructible types
+      }
+    };
+
+  public:
     __host__ __device__
     ~variant()
     {
-      apply_visitor(destroyer(), *this);
+      apply_visitor(destruct_visitor(), *this);
     }
 
   private:
