@@ -778,6 +778,31 @@ bool holds_alternative(const variant<T1,Types...>& v)
   return i == v.index();
 }
 
+
+template<class T, class T1, class... Types>
+__host__ __device__
+typename std::remove_reference<T>::type&
+  get(variant<T1,Types...>& v)
+{
+  return get<tuple_find<T,T1,Types...>::value>(v);
+}
+
+template<class T, class T1, class... Types>
+__host__ __device__
+const typename std::remove_reference<T>::type&
+  get(const variant<T1,Types...>& v)
+{
+  return get<tuple_find<T,T1,Types...>::value>(v);
+}
+
+template<class T, class T1, class... Types>
+__host__ __device__
+typename std::remove_reference<T>::type&&
+  get(variant<T1,Types...>&& v)
+{
+  return std::move(get<tuple_find<T,T1,Types...>::value>(v));
+}
+
 #ifdef VARIANT_UNDEF_HOST
 #  undef __host__
 #  undef VARIANT_UNDEF_HOST
