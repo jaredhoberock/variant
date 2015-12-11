@@ -31,7 +31,7 @@ struct __constexpr_max<i>
 };
 
 
-template<typename T1, typename... Types>
+template<typename... Types>
 class variant;
 
 
@@ -150,11 +150,11 @@ using tuple_find = __tuple_find_impl<0,T,Types...>;
 template<typename T, typename Variant>
 struct __is_variant_alternative;
 
-template<class T, class T1, class... Types>
-struct __is_variant_alternative<T,variant<T1,Types...>>
+template<class T, class... Types>
+struct __is_variant_alternative<T,variant<Types...>>
   : std::integral_constant<
       bool,
-      (tuple_find<T,T1,Types...>::value != variant_not_found)
+      (tuple_find<T,Types...>::value != variant_not_found)
     >
 {};
 
@@ -178,13 +178,38 @@ void __throw_bad_variant_access(const char* what_arg)
 #endif
 }
 
+template<class T, class...>
+struct __first_type
+{
+  using type = T;
+};
 
-template<typename T1, typename... Types>
-class variant
+template<class... Types>
+using __first_type_t = typename __first_type<Types...>::type;
+
+
+template<class... Types>
+class __variant_storage
+{
+  typedef typename std::aligned_storage<
+    __constexpr_max<sizeof(Types)...>::value
+  >::type storage_type;
+  
+  storage_type storage_;
+};
+
+template<>
+class __variant_storage<> {};
+
+
+template<typename... Types>
+class variant : private __variant_storage<Types...>
 {
   public:
     __host__ __device__
-    variant() : variant(T1{}) {}
+    variant()
+      : variant(__first_type_t<Types...>{})
+    {}
 
   private:
     struct binary_move_construct_visitor
@@ -250,15 +275,44 @@ class variant
     };
 
   public:
-    template<typename T,
+    template<class T,
              class = typename std::enable_if<
                __is_variant_alternative<T,variant>::value
              >::type>
     __host__ __device__
     variant(const T& other)
-      : index_(tuple_find<T,T1,Types...>::value)
+      : index_(tuple_find<T,Types...>::value)
     {
       apply_visitor(unary_copy_construct_visitor<T>{other}, *this);
+    }
+
+  private:
+    template<class T>
+    struct unary_move_construct_visitor
+    {
+      T& other;
+
+      __host__ __device__
+      void operator()(T& self)
+      {
+        new (&self) T(std::move(other));
+      }
+
+      template<class U>
+      __host__ __device__
+      void operator()(U&&){}
+    };
+
+  public:
+    template<class T,
+             class = typename std::enable_if<
+               __is_variant_alternative<T,variant>::value
+             >::type>
+    __host__ __device__
+    variant(T&& other)
+      : index_(tuple_find<T,Types...>::value)
+    {
+      apply_visitor(unary_move_construct_visitor<T>{other}, *this);
     }
 
   private:
@@ -483,11 +537,6 @@ class variant
     }
 
   private:
-    typedef typename std::aligned_storage<
-      __constexpr_max<sizeof(T1), sizeof(Types)...>::value
-    >::type storage_type;
-
-    storage_type storage_;
     size_t index_;
 };
 
@@ -506,8 +555,8 @@ struct __ostream_output_visitor
 };
 
 
-template<typename T1, typename... Types>
-std::ostream &operator<<(std::ostream& os, const variant<T1,Types...>& v)
+template<typename... Types>
+std::ostream &operator<<(std::ostream& os, const variant<Types...>& v)
 {
   return apply_visitor(__ostream_output_visitor(os), v);
 }
@@ -564,9 +613,9 @@ template<typename Visitor, typename Result, typename Variant>
 struct __apply_visitor;
 
 
-template<typename Visitor, typename Result, typename T1, typename... Types>
-struct __apply_visitor<Visitor,Result,variant<T1,Types...>>
-  : __apply_visitor_impl<Visitor,Result,T1,Types...>
+template<typename Visitor, typename Result, typename... Types>
+struct __apply_visitor<Visitor,Result,variant<Types...>>
+  : __apply_visitor_impl<Visitor,Result,Types...>
 {};
 
 
@@ -683,10 +732,10 @@ struct __get_visitor
 };
 
 
-template<size_t i, class T1, class... Types>
+template<size_t i, class... Types>
 __host__ __device__
-__variant_element_reference_t<i, variant<T1,Types...>&>
-  get(variant<T1,Types...>& v)
+__variant_element_reference_t<i, variant<Types...>&>
+  get(variant<Types...>& v)
 {
   if(i != v.index())
   {
@@ -694,16 +743,16 @@ __variant_element_reference_t<i, variant<T1,Types...>&>
   }
 
   using type = typename std::decay<
-    variant_element_t<i,variant<T1,Types...>>
+    variant_element_t<i,variant<Types...>>
   >::type;
 
   return *apply_visitor(__get_visitor<type>(), v);
 }
 
-template<size_t i, class T1, class... Types>
+template<size_t i, class... Types>
 __host__ __device__
-__variant_element_reference_t<i, variant<T1,Types...>&&>
-  get(variant<T1,Types...>&& v)
+__variant_element_reference_t<i, variant<Types...>&&>
+  get(variant<Types...>&& v)
 {
   if(i != v.index())
   {
@@ -711,16 +760,16 @@ __variant_element_reference_t<i, variant<T1,Types...>&&>
   }
 
   using type = typename std::decay<
-    variant_element_t<i,variant<T1,Types...>>
+    variant_element_t<i,variant<Types...>>
   >::type;
 
   return std::move(*apply_visitor(__get_visitor<type>(), v));
 }
 
-template<size_t i, class T1, class... Types>
+template<size_t i, class... Types>
 __host__ __device__
-__variant_element_reference_t<i, const variant<T1,Types...>&>
-  get(const variant<T1,Types...>& v)
+__variant_element_reference_t<i, const variant<Types...>&>
+  get(const variant<Types...>& v)
 {
   if(i != v.index())
   {
@@ -728,7 +777,7 @@ __variant_element_reference_t<i, const variant<T1,Types...>&>
   }
 
   using type = typename std::decay<
-    variant_element_t<i,variant<T1,Types...>>
+    variant_element_t<i,variant<Types...>>
   >::type;
 
   return *apply_visitor(__get_visitor<type>(), v);
@@ -757,37 +806,37 @@ struct __find_exactly_one : __find_exactly_one_impl<0,T,Types...>
 };
 
 
-template<class T, class T1, class... Types>
+template<class T, class... Types>
 __host__ __device__
-bool holds_alternative(const variant<T1,Types...>& v)
+bool holds_alternative(const variant<Types...>& v)
 {
-  constexpr size_t i = __find_exactly_one<T,T1,Types...>::value;
+  constexpr size_t i = __find_exactly_one<T,Types...>::value;
   return i == v.index();
 }
 
 
-template<class T, class T1, class... Types>
+template<class T, class... Types>
 __host__ __device__
 typename std::remove_reference<T>::type&
-  get(variant<T1,Types...>& v)
+  get(variant<Types...>& v)
 {
-  return get<tuple_find<T,T1,Types...>::value>(v);
+  return get<tuple_find<T,Types...>::value>(v);
 }
 
-template<class T, class T1, class... Types>
+template<class T, class... Types>
 __host__ __device__
 const typename std::remove_reference<T>::type&
-  get(const variant<T1,Types...>& v)
+  get(const variant<Types...>& v)
 {
-  return get<tuple_find<T,T1,Types...>::value>(v);
+  return get<tuple_find<T,Types...>::value>(v);
 }
 
-template<class T, class T1, class... Types>
+template<class T, class... Types>
 __host__ __device__
 typename std::remove_reference<T>::type&&
-  get(variant<T1,Types...>&& v)
+  get(variant<Types...>&& v)
 {
-  return std::move(get<tuple_find<T,T1,Types...>::value>(v));
+  return std::move(get<tuple_find<T,Types...>::value>(v));
 }
 
 #ifdef VARIANT_UNDEF_HOST
