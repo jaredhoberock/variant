@@ -281,7 +281,7 @@ class variant : private detail::variant_storage<Types...>
     {
       template<class T>
       __host__ __device__
-      void operator()(T& self, T&& other)
+      void operator()(T& self, T& other)
       {
         new (&self) T(std::move(other));
       }
@@ -296,7 +296,7 @@ class variant : private detail::variant_storage<Types...>
     variant(variant&& other)
       : index_(other.index())
     {
-      std::experimental::visit(binary_move_construct_visitor(), *this, std::move(other));
+      std::experimental::visit(binary_move_construct_visitor(), *this, other);
     }
 
   private:
