@@ -412,14 +412,18 @@ class variant : private detail::variant_storage<Types...>
     }
 
   private:
-    struct forward_assign_visitor
+    struct copy_assign_visitor
     {
-      template<class A, class B>
+      template<class T>
       __host__ __device__
-      void operator()(A& a, B&& b) const
+      void operator()(T& self, const T& other) const
       {
-        a = std::forward<B>(b);
+        self = other;
       }
+
+      template<class... Args>
+      __host__ __device__
+      void operator()(Args&&...) const {}
     };
 
     struct destroy_and_copy_construct_visitor
@@ -461,7 +465,7 @@ class variant : private detail::variant_storage<Types...>
     {
       if(index() == other.index())
       {
-        std::experimental::visit(forward_assign_visitor(), *this, other);
+        std::experimental::visit(copy_assign_visitor(), *this, other);
       }
       else
       {
@@ -472,12 +476,29 @@ class variant : private detail::variant_storage<Types...>
       return *this;
     }
 
+  private:
+    struct move_assign_visitor
+    {
+      template<class T>
+      __host__ __device__
+      void operator()(T& self, T& other)
+      {
+        self = std::move(other);
+      }
+
+      template<class... Args>
+      __host__ __device__
+      void operator()(Args&&...){}
+    };
+
+
+  public:
     __host__ __device__
     variant& operator=(variant&& other)
     {
       if(index() == other.index())
       {
-        std::experimental::visit(forward_assign_visitor(), *this, std::move(other));
+        std::experimental::visit(move_assign_visitor(), *this, other);
       }
       else
       {
