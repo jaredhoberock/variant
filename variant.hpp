@@ -418,7 +418,7 @@ class variant : private detail::variant_storage<Types...>
       typename std::enable_if<
         std::is_trivially_destructible<T>::value
       >::type
-        operator()(T& x)
+        operator()(T&)
       {
         // omit invocations of destructors for trivially destructible types
       }
