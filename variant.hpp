@@ -397,11 +397,11 @@ class variant : private VARIANT_DETAIL_NAMESPACE::variant_storage<Types...>
   public:
     template<class T,
              class = typename std::enable_if<
-               detail::is_variant_alternative<T,variant>::value
+               VARIANT_DETAIL_NAMESPACE::is_variant_alternative<T,variant>::value
              >::type>
     VARIANT_ANNOTATION
     variant(const T& other)
-      : index_(detail::find_type<T,Types...>::value)
+      : index_(VARIANT_DETAIL_NAMESPACE::find_type<T,Types...>::value)
     {
       VARIANT_NAMESPACE::visit(unary_copy_construct_visitor<T>{other}, *this);
     }
@@ -713,7 +713,7 @@ struct ostream_output_visitor
 template<typename... Types>
 std::ostream &operator<<(std::ostream& os, const variant<Types...>& v)
 {
-  auto visitor = detail::ostream_output_visitor(os);
+  auto visitor = VARIANT_DETAIL_NAMESPACE::ostream_output_visitor(os);
   return VARIANT_NAMESPACE::visit(visitor, v);
 }
 
