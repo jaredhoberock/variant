@@ -1,4 +1,4 @@
-// Copyright (c) 2015, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -33,22 +33,58 @@
 #include <string>
 #include <cstdio>
 
-#ifndef __host__
-#  define __host__
-#  define VARIANT_UNDEF_HOST
+
+// allow the user to define an annotation to apply to these functions
+#ifndef VARIANT_ANNOTATION
+#  if defined(__CUDACC__) && !(defined(__CUDA__) && defined(__clang__))
+#    define VARIANT_ANNOTATION __host__ __device__
+#  else
+#    define VARIANT_ANNOTATION
+#    define VARIANT_ANNOTATION_NEEDS_UNDEF
+#  endif
 #endif
 
-#ifndef __device__
-#  define __device__
-#  define VARIANT_UNDEF_DEVICE
+
+// define the incantation to silence nvcc errors concerning __host__ __device__ functions
+#if defined(__CUDACC__) && !(defined(__CUDA__) && defined(__clang__))
+#  define VARIANT_EXEC_CHECK_DISABLE \
+#  pragma nv_exec_check_disable
+#else
+#  define VARIANT_EXEC_CHECK_DISABLE
+#endif
+
+// allow the user to define a namespace for these functions
+#if !defined(VARIANT_NAMESPACE)
+
+#  if defined(VARIANT_NAMESPACE_OPEN_BRACE) or defined(VARIANT_NAMESPACE_CLOSE_BRACE)
+#    error "All or none of VARIANT_NAMESPACE, VARIANT_NAMESPACE_OPEN_BRACE, and VARIANT_NAMESPACE_CLOSE_BRACE must be defined."
+#  endif
+
+#  define VARIANT_NAMESPACE std
+#  define VARIANT_NAMESPACE_OPEN_BRACE namespace std {
+#  define VARIANT_NAMESPACE_CLOSE_BRACE }
+#  define VARIANT_NAMESPACE_NEEDS_UNDEF
+
+#else
+
+#  if !defined(VARIANT_NAMESPACE_OPEN_BRACE) or !defined(VARIANT_NAMESPACE_CLOSE_BRACE)
+#    error "All or none of VARIANT_NAMESPACE, VARIANT_NAMESPACE_OPEN_BRACE, and VARIANT_NAMESPACE_CLOSE_BRACE must be defined."
+#  endif
+
 #endif
 
 
-namespace std
-{
-namespace experimental
-{
-namespace detail
+// allow the user to define a singly-nested namespace for private implementation details
+#if !defined(VARIANT_DETAIL_NAMESPACE)
+#  define VARIANT_DETAIL_NAMESPACE detail
+#  define VARIANT_DETAIL_NAMESPACE_NEEDS_UNDEF
+#endif
+
+
+VARIANT_NAMESPACE_OPEN_BRACE
+
+
+namespace VARIANT_DETAIL_NAMESPACE
 {
 
 
@@ -66,14 +102,14 @@ struct constexpr_max<i>
 };
 
 
-} // end detail
+} // end VARIANT_DETAIL_NAMESPACE
 
 
 template<typename... Types>
 class variant;
 
 
-namespace detail
+namespace VARIANT_DETAIL_NAMESPACE
 {
 
 template<size_t i, typename Variant> struct variant_element;
@@ -96,13 +132,13 @@ template<size_t i, typename... Types>
 using variant_element_t = typename variant_element<i,Types...>::type;
 
 
-} // end detail
+} // end VARIANT_DETAIL_NAMESPACE
 
 
 static constexpr const size_t variant_not_found = static_cast<size_t>(-1);
 
 
-namespace detail
+namespace VARIANT_DETAIL_NAMESPACE
 {
 
 
@@ -147,44 +183,44 @@ template<size_t i, typename VariantReference>
 using variant_element_reference_t = typename variant_element_reference<i,VariantReference>::type;
 
 
-} // end detail
+} // end VARIANT_DETAIL_NAMESPACE
 
 
 template<typename Visitor, typename Variant>
-__host__ __device__
+VARIANT_ANNOTATION
 typename std::result_of<
-  Visitor&(detail::variant_element_reference_t<0,Variant&&>)
+  Visitor&(VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant&&>)
 >::type
   visit(Visitor& visitor, Variant&& var);
 
 
 template<typename Visitor, typename Variant>
-__host__ __device__
+VARIANT_ANNOTATION
 typename std::result_of<
-  const Visitor&(detail::variant_element_reference_t<0,Variant&&>)
+  const Visitor&(VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant&&>)
 >::type
   visit(const Visitor& visitor, Variant&& var);
 
 
 template<typename Visitor, typename Variant1, typename Variant2>
-__host__ __device__
+VARIANT_ANNOTATION
 typename std::result_of<
-  Visitor&(detail::variant_element_reference_t<0,Variant1&&>,
-           detail::variant_element_reference_t<0,Variant2&&>)
+  Visitor&(VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant1&&>,
+           VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant2&&>)
 >::type
   visit(Visitor& visitor, Variant1&& var1, Variant2&& var2);
 
 
 template<typename Visitor, typename Variant1, typename Variant2>
-__host__ __device__
+VARIANT_ANNOTATION
 typename std::result_of<
-  const Visitor&(detail::variant_element_reference_t<0,Variant1&&>,
-                 detail::variant_element_reference_t<0,Variant2&&>)
+  const Visitor&(VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant1&&>,
+                 VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant2&&>)
 >::type
   visit(const Visitor& visitor, Variant1&& var1, Variant2&& var2);
 
 
-namespace detail
+namespace VARIANT_DETAIL_NAMESPACE
 {
 
 
@@ -231,7 +267,7 @@ struct is_variant_alternative<T,variant<Types...>>
 {};
 
 
-} // end detail
+} // end VARIANT_DETAIL_NAMESPACE
 
 
 class bad_variant_access : public std::logic_error
@@ -242,11 +278,11 @@ class bad_variant_access : public std::logic_error
 };
 
 
-namespace detail
+namespace VARIANT_DETAIL_NAMESPACE
 {
 
 
-__host__ __device__
+VARIANT_ANNOTATION
 inline void throw_bad_variant_access(const char* what_arg)
 {
 #ifdef __CUDA_ARCH__
@@ -281,64 +317,64 @@ class variant_storage
 template<>
 class variant_storage<> {};
 
-} // end detail
+} // end VARIANT_DETAIL_NAMESPACE
 
 
 template<typename... Types>
-class variant : private detail::variant_storage<Types...>
+class variant : private VARIANT_DETAIL_NAMESPACE::variant_storage<Types...>
 {
   public:
-    __host__ __device__
+    VARIANT_ANNOTATION
     variant()
-      : variant(detail::first_type_t<Types...>{})
+      : variant(VARIANT_DETAIL_NAMESPACE::first_type_t<Types...>{})
     {}
 
   private:
     struct binary_move_construct_visitor
     {
       template<class T>
-      __host__ __device__
+      VARIANT_ANNOTATION
       void operator()(T& self, T& other)
       {
         new (&self) T(std::move(other));
       }
 
       template<class... Args>
-      __host__ __device__
+      VARIANT_ANNOTATION
       void operator()(Args&&...){}
     };
 
   public:
-    __host__ __device__
+    VARIANT_ANNOTATION
     variant(variant&& other)
       : index_(other.index())
     {
       auto visitor = binary_move_construct_visitor();
-      std::experimental::visit(visitor, *this, other);
+      VARIANT_NAMESPACE::visit(visitor, *this, other);
     }
 
   private:
     struct binary_copy_construct_visitor
     {
       template<class T>
-      __host__ __device__
+      VARIANT_ANNOTATION
       void operator()(T& self, const T& other)
       {
         new (&self) T(other);
       }
 
       template<class... Args>
-      __host__ __device__
+      VARIANT_ANNOTATION
       void operator()(Args&&...){}
     };
 
   public:
-    __host__ __device__
+    VARIANT_ANNOTATION
     variant(const variant& other)
       : index_(other.index())
     {
       auto visitor = binary_copy_construct_visitor();
-      std::experimental::visit(visitor, *this, other);
+      VARIANT_NAMESPACE::visit(visitor, *this, other);
     }
 
   private:
@@ -347,14 +383,14 @@ class variant : private detail::variant_storage<Types...>
     {
       const T& other;
 
-      __host__ __device__
+      VARIANT_ANNOTATION
       void operator()(T& self)
       {
         new (&self) T(other);
       }
 
       template<class U>
-      __host__ __device__
+      VARIANT_ANNOTATION
       void operator()(U&&) {}
     };
 
@@ -363,11 +399,11 @@ class variant : private detail::variant_storage<Types...>
              class = typename std::enable_if<
                detail::is_variant_alternative<T,variant>::value
              >::type>
-    __host__ __device__
+    VARIANT_ANNOTATION
     variant(const T& other)
       : index_(detail::find_type<T,Types...>::value)
     {
-      std::experimental::visit(unary_copy_construct_visitor<T>{other}, *this);
+      VARIANT_NAMESPACE::visit(unary_copy_construct_visitor<T>{other}, *this);
     }
 
   private:
@@ -376,35 +412,35 @@ class variant : private detail::variant_storage<Types...>
     {
       T& other;
 
-      __host__ __device__
+      VARIANT_ANNOTATION
       void operator()(T& self)
       {
         new (&self) T(std::move(other));
       }
 
       template<class U>
-      __host__ __device__
+      VARIANT_ANNOTATION
       void operator()(U&&){}
     };
 
   public:
     template<class T,
              class = typename std::enable_if<
-               detail::is_variant_alternative<T,variant>::value
+               VARIANT_DETAIL_NAMESPACE::is_variant_alternative<T,variant>::value
              >::type>
-    __host__ __device__
+    VARIANT_ANNOTATION
     variant(T&& other)
-      : index_(detail::find_type<T,Types...>::value)
+      : index_(VARIANT_DETAIL_NAMESPACE::find_type<T,Types...>::value)
     {
       auto visitor = unary_move_construct_visitor<T>{other};
-      std::experimental::visit(visitor, *this);
+      VARIANT_NAMESPACE::visit(visitor, *this);
     }
 
   private:
     struct destruct_visitor
     {
       template<typename T>
-      __host__ __device__
+      VARIANT_ANNOTATION
       typename std::enable_if<
         !std::is_trivially_destructible<T>::value
       >::type
@@ -414,7 +450,7 @@ class variant : private detail::variant_storage<Types...>
       }
       
       template<typename T>
-      __host__ __device__
+      VARIANT_ANNOTATION
       typename std::enable_if<
         std::is_trivially_destructible<T>::value
       >::type
@@ -425,32 +461,32 @@ class variant : private detail::variant_storage<Types...>
     };
 
   public:
-    __host__ __device__
+    VARIANT_ANNOTATION
     ~variant()
     {
       auto visitor = destruct_visitor();
-      std::experimental::visit(visitor, *this);
+      VARIANT_NAMESPACE::visit(visitor, *this);
     }
 
   private:
     struct copy_assign_visitor
     {
       template<class T>
-      __host__ __device__
+      VARIANT_ANNOTATION
       void operator()(T& self, const T& other) const
       {
         self = other;
       }
 
       template<class... Args>
-      __host__ __device__
+      VARIANT_ANNOTATION
       void operator()(Args&&...) const {}
     };
 
     struct destroy_and_copy_construct_visitor
     {
       template<class A, class B>
-      __host__ __device__
+      VARIANT_ANNOTATION
       void operator()(A& a, const B& b) const
       {
         // copy b to a temporary
@@ -467,7 +503,7 @@ class variant : private detail::variant_storage<Types...>
     struct destroy_and_move_construct_visitor
     {
       template<class A, class B>
-      __host__ __device__
+      VARIANT_ANNOTATION
       void operator()(A& a, B&& b) const
       {
         // destroy a
@@ -481,16 +517,16 @@ class variant : private detail::variant_storage<Types...>
     };
 
   public:
-    __host__ __device__
+    VARIANT_ANNOTATION
     variant& operator=(const variant& other)
     {
       if(index() == other.index())
       {
-        std::experimental::visit(copy_assign_visitor(), *this, other);
+        VARIANT_NAMESPACE::visit(copy_assign_visitor(), *this, other);
       }
       else
       {
-        std::experimental::visit(destroy_and_copy_construct_visitor(), *this, other);
+        VARIANT_NAMESPACE::visit(destroy_and_copy_construct_visitor(), *this, other);
         index_ = other.index();
       }
 
@@ -501,38 +537,38 @@ class variant : private detail::variant_storage<Types...>
     struct move_assign_visitor
     {
       template<class T>
-      __host__ __device__
+      VARIANT_ANNOTATION
       void operator()(T& self, T& other)
       {
         self = std::move(other);
       }
 
       template<class... Args>
-      __host__ __device__
+      VARIANT_ANNOTATION
       void operator()(Args&&...){}
     };
 
 
   public:
-    __host__ __device__
+    VARIANT_ANNOTATION
     variant& operator=(variant&& other)
     {
       if(index() == other.index())
       {
         auto visitor = move_assign_visitor();
-        std::experimental::visit(visitor, *this, other);
+        VARIANT_NAMESPACE::visit(visitor, *this, other);
       }
       else
       {
         auto visitor = destroy_and_move_construct_visitor();
-        std::experimental::visit(visitor, *this, std::move(other));
+        VARIANT_NAMESPACE::visit(visitor, *this, std::move(other));
         index_ = other.index();
       }
 
       return *this;
     }
 
-    __host__ __device__
+    VARIANT_ANNOTATION
     size_t index() const
     {
       return index_;
@@ -542,10 +578,11 @@ class variant : private detail::variant_storage<Types...>
     struct swap_visitor
     {
       template<class A, class B>
-      __host__ __device__
+      VARIANT_ANNOTATION
       void operator()(A& a, B& b)
       {
         // XXX can't call std::swap because __host__ __device__
+        //     should call swap CPO instead
         A tmp = std::move(a);
         a = std::move(b);
         b = std::move(tmp);
@@ -553,13 +590,13 @@ class variant : private detail::variant_storage<Types...>
     };
 
   public:
-    __host__ __device__
+    VARIANT_ANNOTATION
     void swap(variant& other)
     {
       if(index() == other.index())
       {
         auto visitor = swap_visitor();
-        std::experimental::visit(visitor, *this, other);
+        VARIANT_NAMESPACE::visit(visitor, *this, other);
       }
       else
       {
@@ -573,14 +610,14 @@ class variant : private detail::variant_storage<Types...>
     struct equals
     {
       template<typename U1, typename U2>
-      __host__ __device__
+      VARIANT_ANNOTATION
       bool operator()(const U1&, const U2&)
       {
         return false;
       }
 
       template<typename T>
-      __host__ __device__
+      VARIANT_ANNOTATION
       bool operator()(const T& lhs, const T& rhs)
       {
         return lhs == rhs;
@@ -589,14 +626,14 @@ class variant : private detail::variant_storage<Types...>
 
 
   public:
-    __host__ __device__
+    VARIANT_ANNOTATION
     bool operator==(const variant& rhs) const
     {
       auto visitor = equals();
-      return index() == rhs.index() && std::experimental::visit(visitor, *this, rhs);
+      return index() == rhs.index() && VARIANT_NAMESPACE::visit(visitor, *this, rhs);
     }
 
-    __host__ __device__
+    VARIANT_ANNOTATION
     bool operator!=(const variant& rhs) const
     {
       return !operator==(rhs);
@@ -606,14 +643,14 @@ class variant : private detail::variant_storage<Types...>
     struct less
     {
       template<typename U1, typename U2>
-      __host__ __device__
+      VARIANT_ANNOTATION
       bool operator()(const U1&, const U2&)
       {
         return false;
       }
 
       template<typename T>
-      __host__ __device__
+      VARIANT_ANNOTATION
       bool operator()(const T& lhs, const T& rhs)
       {
         return lhs < rhs;
@@ -621,27 +658,27 @@ class variant : private detail::variant_storage<Types...>
     };
 
   public:
-    __host__ __device__
+    VARIANT_ANNOTATION
     bool operator<(const variant& rhs) const
     {
       if(index() != rhs.index()) return index() < rhs.index();
 
-      return std::experimental::visit(less(), *this, rhs);
+      return VARIANT_NAMESPACE::visit(less(), *this, rhs);
     }
 
-    __host__ __device__
+    VARIANT_ANNOTATION
     bool operator<=(const variant& rhs) const
     {
       return !(rhs < *this);
     }
 
-    __host__ __device__
+    VARIANT_ANNOTATION
     bool operator>(const variant& rhs) const
     {
       return rhs < *this;
     }
 
-    __host__ __device__
+    VARIANT_ANNOTATION
     bool operator>=(const variant& rhs) const
     {
       return !(*this < rhs);
@@ -652,7 +689,7 @@ class variant : private detail::variant_storage<Types...>
 };
 
 
-namespace detail
+namespace VARIANT_DETAIL_NAMESPACE
 {
 
 
@@ -670,18 +707,18 @@ struct ostream_output_visitor
 };
 
 
-} // detail
+} // VARIANT_DETAIL_NAMESPACE
 
 
 template<typename... Types>
 std::ostream &operator<<(std::ostream& os, const variant<Types...>& v)
 {
   auto visitor = detail::ostream_output_visitor(os);
-  return std::experimental::visit(visitor, v);
+  return VARIANT_NAMESPACE::visit(visitor, v);
 }
 
 
-namespace detail
+namespace VARIANT_DETAIL_NAMESPACE
 {
 
 
@@ -690,7 +727,7 @@ struct apply_visitor_impl : apply_visitor_impl<VisitorReference,Result,Types...>
 {
   typedef apply_visitor_impl<VisitorReference,Result,Types...> super_t;
 
-  __host__ __device__
+  VARIANT_ANNOTATION
   static Result do_it(VisitorReference visitor, void* ptr, size_t index)
   {
     if(index == 0)
@@ -702,7 +739,7 @@ struct apply_visitor_impl : apply_visitor_impl<VisitorReference,Result,Types...>
   }
 
 
-  __host__ __device__
+  VARIANT_ANNOTATION
   static Result do_it(VisitorReference visitor, const void* ptr, size_t index)
   {
     if(index == 0)
@@ -718,13 +755,13 @@ struct apply_visitor_impl : apply_visitor_impl<VisitorReference,Result,Types...>
 template<typename VisitorReference, typename Result, typename T>
 struct apply_visitor_impl<VisitorReference,Result,T>
 {
-  __host__ __device__
+  VARIANT_ANNOTATION
   static Result do_it(VisitorReference visitor, void* ptr, size_t)
   {
     return visitor(*reinterpret_cast<T*>(ptr));
   }
 
-  __host__ __device__
+  VARIANT_ANNOTATION
   static Result do_it(VisitorReference visitor, const void* ptr, size_t)
   {
     return visitor(*reinterpret_cast<const T*>(ptr));
@@ -742,44 +779,44 @@ struct apply_visitor<VisitorReference,Result,variant<Types...>>
 {};
 
 
-} // end detail
+} // end VARIANT_DETAIL_ANNOTATION
 
 
 template<typename Visitor, typename Variant>
-__host__ __device__
+VARIANT_ANNOTATION
 typename std::result_of<
-  Visitor&(detail::variant_element_reference_t<0,Variant&&>)
+  Visitor&(VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant&&>)
 >::type
   visit(Visitor& visitor, Variant&& var)
 {
   using result_type = typename std::result_of<
-    Visitor&(detail::variant_element_reference_t<0,Variant&&>)
+    Visitor&(VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant&&>)
   >::type;
 
-  using impl = detail::apply_visitor<Visitor&,result_type,typename std::decay<Variant>::type>;
+  using impl = VARIANT_DETAIL_NAMESPACE::apply_visitor<Visitor&,result_type,typename std::decay<Variant>::type>;
 
   return impl::do_it(visitor, &var, var.index());
 }
 
 
 template<typename Visitor, typename Variant>
-__host__ __device__
+VARIANT_ANNOTATION
 typename std::result_of<
-  const Visitor&(detail::variant_element_reference_t<0,Variant&&>)
+  const Visitor&(VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant&&>)
 >::type
   visit(const Visitor& visitor, Variant&& var)
 {
   using result_type = typename std::result_of<
-    const Visitor&(detail::variant_element_reference_t<0,Variant&&>)
+    const Visitor&(VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant&&>)
   >::type;
  
-  using impl = detail::apply_visitor<const Visitor&,result_type,typename std::decay<Variant>::type>;
+  using impl = VARIANT_DETAIL_NAMESPACE::apply_visitor<const Visitor&,result_type,typename std::decay<Variant>::type>;
 
   return impl::do_it(visitor, &var, var.index());
 }
 
 
-namespace detail
+namespace VARIANT_DETAIL_NAMESPACE
 {
 
 
@@ -789,11 +826,11 @@ struct unary_visitor_binder
   VisitorReference visitor;
   ElementReference x;
 
-  __host__ __device__
+  VARIANT_ANNOTATION
   unary_visitor_binder(VisitorReference visitor, ElementReference x) : visitor(visitor), x(x) {}
 
   template<typename T>
-  __host__ __device__
+  VARIANT_ANNOTATION
   Result operator()(T&& y)
   {
     return visitor(x, std::forward<T>(y));
@@ -823,148 +860,148 @@ struct binary_visitor_binder
   // when we use y in operator(), we cast it back to the original reference type
   typename rvalue_reference_to_lvalue_reference<VariantReference>::type y;
 
-  __host__ __device__
+  VARIANT_ANNOTATION
   binary_visitor_binder(VisitorReference visitor, VariantReference ref) : visitor(visitor), y(ref) {}
 
   template<typename T>
-  __host__ __device__
+  VARIANT_ANNOTATION
   Result operator()(T&& x)
   {
     auto unary_visitor = unary_visitor_binder<VisitorReference, Result, decltype(x)>(visitor, std::forward<T>(x));
-    return std::experimental::visit(unary_visitor, std::forward<VariantReference>(y));
+    return VARIANT_NAMESPACE::visit(unary_visitor, std::forward<VariantReference>(y));
   }
 };
 
 
-} // end detail
+} // end VARIANT_DETAIL_NAMESPACE
 
 
 template<typename Visitor, typename Variant1, typename Variant2>
-__host__ __device__
+VARIANT_ANNOTATION
 typename std::result_of<
-  Visitor&(detail::variant_element_reference_t<0,Variant1&&>,
-           detail::variant_element_reference_t<0,Variant2&&>)
+  Visitor&(VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant1&&>,
+           VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant2&&>)
 >::type
   visit(Visitor& visitor, Variant1&& var1, Variant2&& var2)
 {
   using result_type = typename std::result_of<
-    Visitor&(detail::variant_element_reference_t<0,Variant1&&>,
-             detail::variant_element_reference_t<0,Variant2&&>)
+    Visitor&(VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant1&&>,
+             VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant2&&>)
   >::type;
 
-  auto visitor_wrapper = detail::binary_visitor_binder<Visitor&,result_type,decltype(var2)>(visitor, std::forward<Variant2>(var2));
+  auto visitor_wrapper = VARIANT_DETAIL_NAMESPACE::binary_visitor_binder<Visitor&,result_type,decltype(var2)>(visitor, std::forward<Variant2>(var2));
 
-  return std::experimental::visit(visitor_wrapper, std::forward<Variant1>(var1));
+  return VARIANT_NAMESPACE::visit(visitor_wrapper, std::forward<Variant1>(var1));
 }
 
 
 template<typename Visitor, typename Variant1, typename Variant2>
-__host__ __device__
+VARIANT_ANNOTATION
 typename std::result_of<
-  const Visitor&(detail::variant_element_reference_t<0,Variant1&&>,
-                 detail::variant_element_reference_t<0,Variant2&&>)
+  const Visitor&(VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant1&&>,
+                 VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant2&&>)
 >::type
   visit(const Visitor& visitor, Variant1&& var1, Variant2&& var2)
 {
   using result_type = typename std::result_of<
-    const Visitor&(detail::variant_element_reference_t<0,Variant1&&>,
-                   detail::variant_element_reference_t<0,Variant2&&>)
+    const Visitor&(VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant1&&>,
+                   VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant2&&>)
   >::type;
 
-  auto visitor_wrapper = detail::binary_visitor_binder<const Visitor&,result_type,decltype(var2)>(visitor, std::forward<Variant2>(var2));
+  auto visitor_wrapper = VARIANT_DETAIL_NAMESPACE::binary_visitor_binder<const Visitor&,result_type,decltype(var2)>(visitor, std::forward<Variant2>(var2));
 
-  return std::experimental::visit(visitor_wrapper, std::forward<Variant1>(var1));
+  return VARIANT_NAMESPACE::visit(visitor_wrapper, std::forward<Variant1>(var1));
 }
 
 
-namespace detail
+namespace VARIANT_DETAIL_NAMESPACE
 {
 
 
 template<class T>
 struct get_visitor
 {
-  __host__ __device__
+  VARIANT_ANNOTATION
   T* operator()(T& x) const
   {
     return &x;
   }
 
-  __host__ __device__
+  VARIANT_ANNOTATION
   const T* operator()(const T& x) const
   {
     return &x;
   }
 
   template<class U>
-  __host__ __device__
+  VARIANT_ANNOTATION
   T* operator()(U&&) const
   {
     return nullptr;
   }
 };
 
-} // end detail
+} // end VARIANT_DETAIL_NAMESPACE
 
 
 template<size_t i, class... Types>
-__host__ __device__
-detail::variant_element_reference_t<i, variant<Types...>&>
+VARIANT_ANNOTATION
+VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<i, variant<Types...>&>
   get(variant<Types...>& v)
 {
   if(i != v.index())
   {
-    detail::throw_bad_variant_access("i does not equal index()");
+    VARIANT_DETAIL_NAMESPACE::throw_bad_variant_access("i does not equal index()");
   }
 
   using type = typename std::decay<
-    detail::variant_element_t<i,variant<Types...>>
+    VARIANT_DETAIL_NAMESPACE::variant_element_t<i,variant<Types...>>
   >::type;
 
-  auto visitor = detail::get_visitor<type>();
-  return *std::experimental::visit(visitor, v);
+  auto visitor = VARIANT_DETAIL_NAMESPACE::get_visitor<type>();
+  return *VARIANT_NAMESPACE::visit(visitor, v);
 }
 
 
 template<size_t i, class... Types>
-__host__ __device__
-detail::variant_element_reference_t<i, variant<Types...>&&>
+VARIANT_ANNOTATION
+VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<i, variant<Types...>&&>
   get(variant<Types...>&& v)
 {
   if(i != v.index())
   {
-    detail::throw_bad_variant_access("i does not equal index()");
+    VARIANT_DETAIL_NAMESPACE::throw_bad_variant_access("i does not equal index()");
   }
 
   using type = typename std::decay<
-    detail::variant_element_t<i,variant<Types...>>
+    VARIANT_DETAIL_NAMESPACE::variant_element_t<i,variant<Types...>>
   >::type;
 
-  auto visitor = detail::get_visitor<type>();
-  return std::move(*std::experimental::visit(visitor, v));
+  auto visitor = VARIANT_DETAIL_NAMESPACE::get_visitor<type>();
+  return std::move(*VARIANT_NAMESPACE::visit(visitor, v));
 }
 
 
 template<size_t i, class... Types>
-__host__ __device__
-detail::variant_element_reference_t<i, const variant<Types...>&>
+VARIANT_ANNOTATION
+VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<i, const variant<Types...>&>
   get(const variant<Types...>& v)
 {
   if(i != v.index())
   {
-    detail::throw_bad_variant_access("i does not equal index()");
+    VARIANT_DETAIL_NAMESPACE::throw_bad_variant_access("i does not equal index()");
   }
 
   using type = typename std::decay<
-    detail::variant_element_t<i,variant<Types...>>
+    VARIANT_DETAIL_NAMESPACE::variant_element_t<i,variant<Types...>>
   >::type;
 
-  auto visitor = detail::get_visitor<type>();
-  return *std::experimental::visit(visitor, v);
+  auto visitor = VARIANT_DETAIL_NAMESPACE::get_visitor<type>();
+  return *VARIANT_NAMESPACE::visit(visitor, v);
 }
 
 
-namespace detail
+namespace VARIANT_DETAIL_NAMESPACE
 {
 
 
@@ -991,55 +1028,64 @@ struct find_exactly_one : find_exactly_one_impl<0,T,Types...>
 };
 
 
-} // end detail
+} // end VARIANT_DETAIL_NAMESPACE
 
 
 template<class T, class... Types>
-__host__ __device__
+VARIANT_ANNOTATION
 bool holds_alternative(const variant<Types...>& v)
 {
-  constexpr size_t i = detail::find_exactly_one<T,Types...>::value;
+  constexpr size_t i = VARIANT_DETAIL_NAMESPACE::find_exactly_one<T,Types...>::value;
   return i == v.index();
 }
 
 
 template<class T, class... Types>
-__host__ __device__
+VARIANT_ANNOTATION
 typename std::remove_reference<T>::type&
   get(variant<Types...>& v)
 {
-  return get<detail::find_type<T,Types...>::value>(v);
+  return get<VARIANT_DETAIL_NAMESPACE::find_type<T,Types...>::value>(v);
 }
 
 
 template<class T, class... Types>
-__host__ __device__
+VARIANT_ANNOTATION
 const typename std::remove_reference<T>::type&
   get(const variant<Types...>& v)
 {
-  return get<detail::find_type<T,Types...>::value>(v);
+  return get<VARIANT_DETAIL_NAMESPACE::find_type<T,Types...>::value>(v);
 }
 
 
 template<class T, class... Types>
-__host__ __device__
+VARIANT_ANNOTATION
 typename std::remove_reference<T>::type&&
   get(variant<Types...>&& v)
 {
-  return std::move(get<detail::find_type<T,Types...>::value>(v));
+  return std::move(get<VARIANT_DETAIL_NAMESPACE::find_type<T,Types...>::value>(v));
 }
 
 
-} // end experimental
-} // end std
+VARIANT_NAMESPACE_CLOSE_BRACE
 
-#ifdef VARIANT_UNDEF_HOST
-#  undef __host__
-#  undef VARIANT_UNDEF_HOST
+
+#ifdef VARIANT_ANNOTATION_NEEDS_UNDEF
+#  undef VARIANT_ANNOTATION
+#  undef VARIANT_ANNOTATION_NEEDS_UNDEF
 #endif
 
-#ifdef VARIANT_UNDEF_DEVICE
-#  undef __device__
-#  undef VARIANT_UNDEF_DEVICE
+#ifdef VARIANT_NAMESPACE_NEEDS_UNDEF
+#  undef VARIANT_NAMESPACE
+#  undef VARIANT_NAMESPACE_OPEN_BRACE
+#  undef VARIANT_NAMESPACE_CLOSE_BRACE
+#  undef VARIANT_NAMESPACE_NEEDS_UNDEF
 #endif
+
+#ifdef VARIANT_DETAIL_NAMESPACE_NEEDS_UNDEF
+#  undef VARIANT_DETAIL_NAMESPACE
+#  undef VARIANT_DETAIL_NAMESPACE_NEEDS_UNDEF
+#endif
+
+#undef VARIANT_EXEC_CHECK_DISABLE
 

@@ -5,7 +5,7 @@
 
 int main()
 {
-  using namespace std::experimental;
+  using namespace std;
 
   variant<char, int, float, double> v1;
   assert(v1.index() == 0);

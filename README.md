@@ -1,4 +1,4 @@
 variant
 =======
 
-Standalone C++11 implementation of variant
+Standalone C++11 implementation of std::variant
