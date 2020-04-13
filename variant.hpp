@@ -109,30 +109,24 @@ template<typename... Types>
 class variant;
 
 
-namespace VARIANT_DETAIL_NAMESPACE
-{
-
-template<size_t i, typename Variant> struct variant_element;
+template<size_t i, typename Variant> struct variant_alternative;
 
 
 template<size_t i, typename T0, typename... Types>
-struct variant_element<i, variant<T0, Types...>>
-  : variant_element<i-1,variant<Types...>>
+struct variant_alternative<i, variant<T0, Types...>>
+  : variant_alternative<i-1,variant<Types...>>
 {};
 
 
 template<typename T0, typename... Types>
-struct variant_element<0, variant<T0, Types...>>
+struct variant_alternative<0, variant<T0, Types...>>
 {
   typedef T0 type;
 };
 
 
 template<size_t i, typename... Types>
-using variant_element_t = typename variant_element<i,Types...>::type;
-
-
-} // end VARIANT_DETAIL_NAMESPACE
+using variant_alternative_t = typename variant_alternative<i,Types...>::type;
 
 
 static constexpr const size_t variant_npos = static_cast<size_t>(-1);
@@ -168,10 +162,10 @@ struct propagate_reference<T&&, U>
 
 
 template<size_t i, typename VariantReference>
-struct variant_element_reference
+struct variant_alternative_reference
   : propagate_reference<
       VariantReference,
-      variant_element_t<
+      variant_alternative_t<
         i,
         typename std::decay<VariantReference>::type
       >
@@ -180,7 +174,7 @@ struct variant_element_reference
 
 
 template<size_t i, typename VariantReference>
-using variant_element_reference_t = typename variant_element_reference<i,VariantReference>::type;
+using variant_alternative_reference_t = typename variant_alternative_reference<i,VariantReference>::type;
 
 
 } // end VARIANT_DETAIL_NAMESPACE
@@ -189,7 +183,7 @@ using variant_element_reference_t = typename variant_element_reference<i,Variant
 template<typename Visitor, typename Variant>
 VARIANT_ANNOTATION
 typename std::result_of<
-  Visitor&(VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant&&>)
+  Visitor&(VARIANT_DETAIL_NAMESPACE::variant_alternative_reference_t<0,Variant&&>)
 >::type
   visit(Visitor& visitor, Variant&& var);
 
@@ -197,7 +191,7 @@ typename std::result_of<
 template<typename Visitor, typename Variant>
 VARIANT_ANNOTATION
 typename std::result_of<
-  const Visitor&(VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant&&>)
+  const Visitor&(VARIANT_DETAIL_NAMESPACE::variant_alternative_reference_t<0,Variant&&>)
 >::type
   visit(const Visitor& visitor, Variant&& var);
 
@@ -205,8 +199,8 @@ typename std::result_of<
 template<typename Visitor, typename Variant1, typename Variant2>
 VARIANT_ANNOTATION
 typename std::result_of<
-  Visitor&(VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant1&&>,
-           VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant2&&>)
+  Visitor&(VARIANT_DETAIL_NAMESPACE::variant_alternative_reference_t<0,Variant1&&>,
+           VARIANT_DETAIL_NAMESPACE::variant_alternative_reference_t<0,Variant2&&>)
 >::type
   visit(Visitor& visitor, Variant1&& var1, Variant2&& var2);
 
@@ -214,8 +208,8 @@ typename std::result_of<
 template<typename Visitor, typename Variant1, typename Variant2>
 VARIANT_ANNOTATION
 typename std::result_of<
-  const Visitor&(VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant1&&>,
-                 VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant2&&>)
+  const Visitor&(VARIANT_DETAIL_NAMESPACE::variant_alternative_reference_t<0,Variant1&&>,
+                 VARIANT_DETAIL_NAMESPACE::variant_alternative_reference_t<0,Variant2&&>)
 >::type
   visit(const Visitor& visitor, Variant1&& var1, Variant2&& var2);
 
@@ -785,12 +779,12 @@ struct apply_visitor<VisitorReference,Result,variant<Types...>>
 template<typename Visitor, typename Variant>
 VARIANT_ANNOTATION
 typename std::result_of<
-  Visitor&(VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant&&>)
+  Visitor&(VARIANT_DETAIL_NAMESPACE::variant_alternative_reference_t<0,Variant&&>)
 >::type
   visit(Visitor& visitor, Variant&& var)
 {
   using result_type = typename std::result_of<
-    Visitor&(VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant&&>)
+    Visitor&(VARIANT_DETAIL_NAMESPACE::variant_alternative_reference_t<0,Variant&&>)
   >::type;
 
   using impl = VARIANT_DETAIL_NAMESPACE::apply_visitor<Visitor&,result_type,typename std::decay<Variant>::type>;
@@ -802,12 +796,12 @@ typename std::result_of<
 template<typename Visitor, typename Variant>
 VARIANT_ANNOTATION
 typename std::result_of<
-  const Visitor&(VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant&&>)
+  const Visitor&(VARIANT_DETAIL_NAMESPACE::variant_alternative_reference_t<0,Variant&&>)
 >::type
   visit(const Visitor& visitor, Variant&& var)
 {
   using result_type = typename std::result_of<
-    const Visitor&(VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant&&>)
+    const Visitor&(VARIANT_DETAIL_NAMESPACE::variant_alternative_reference_t<0,Variant&&>)
   >::type;
  
   using impl = VARIANT_DETAIL_NAMESPACE::apply_visitor<const Visitor&,result_type,typename std::decay<Variant>::type>;
@@ -879,14 +873,14 @@ struct binary_visitor_binder
 template<typename Visitor, typename Variant1, typename Variant2>
 VARIANT_ANNOTATION
 typename std::result_of<
-  Visitor&(VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant1&&>,
-           VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant2&&>)
+  Visitor&(VARIANT_DETAIL_NAMESPACE::variant_alternative_reference_t<0,Variant1&&>,
+           VARIANT_DETAIL_NAMESPACE::variant_alternative_reference_t<0,Variant2&&>)
 >::type
   visit(Visitor& visitor, Variant1&& var1, Variant2&& var2)
 {
   using result_type = typename std::result_of<
-    Visitor&(VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant1&&>,
-             VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant2&&>)
+    Visitor&(VARIANT_DETAIL_NAMESPACE::variant_alternative_reference_t<0,Variant1&&>,
+             VARIANT_DETAIL_NAMESPACE::variant_alternative_reference_t<0,Variant2&&>)
   >::type;
 
   auto visitor_wrapper = VARIANT_DETAIL_NAMESPACE::binary_visitor_binder<Visitor&,result_type,decltype(var2)>(visitor, std::forward<Variant2>(var2));
@@ -898,14 +892,14 @@ typename std::result_of<
 template<typename Visitor, typename Variant1, typename Variant2>
 VARIANT_ANNOTATION
 typename std::result_of<
-  const Visitor&(VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant1&&>,
-                 VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant2&&>)
+  const Visitor&(VARIANT_DETAIL_NAMESPACE::variant_alternative_reference_t<0,Variant1&&>,
+                 VARIANT_DETAIL_NAMESPACE::variant_alternative_reference_t<0,Variant2&&>)
 >::type
   visit(const Visitor& visitor, Variant1&& var1, Variant2&& var2)
 {
   using result_type = typename std::result_of<
-    const Visitor&(VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant1&&>,
-                   VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<0,Variant2&&>)
+    const Visitor&(VARIANT_DETAIL_NAMESPACE::variant_alternative_reference_t<0,Variant1&&>,
+                   VARIANT_DETAIL_NAMESPACE::variant_alternative_reference_t<0,Variant2&&>)
   >::type;
 
   auto visitor_wrapper = VARIANT_DETAIL_NAMESPACE::binary_visitor_binder<const Visitor&,result_type,decltype(var2)>(visitor, std::forward<Variant2>(var2));
@@ -946,7 +940,7 @@ struct get_visitor
 
 template<size_t i, class... Types>
 VARIANT_ANNOTATION
-VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<i, variant<Types...>&>
+VARIANT_DETAIL_NAMESPACE::variant_alternative_reference_t<i, variant<Types...>&>
   get(variant<Types...>& v)
 {
   if(i != v.index())
@@ -955,7 +949,7 @@ VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<i, variant<Types...>&>
   }
 
   using type = typename std::decay<
-    VARIANT_DETAIL_NAMESPACE::variant_element_t<i,variant<Types...>>
+    variant_alternative_t<i,variant<Types...>>
   >::type;
 
   auto visitor = VARIANT_DETAIL_NAMESPACE::get_visitor<type>();
@@ -965,7 +959,7 @@ VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<i, variant<Types...>&>
 
 template<size_t i, class... Types>
 VARIANT_ANNOTATION
-VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<i, variant<Types...>&&>
+VARIANT_DETAIL_NAMESPACE::variant_alternative_reference_t<i, variant<Types...>&&>
   get(variant<Types...>&& v)
 {
   if(i != v.index())
@@ -974,7 +968,7 @@ VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<i, variant<Types...>&&>
   }
 
   using type = typename std::decay<
-    VARIANT_DETAIL_NAMESPACE::variant_element_t<i,variant<Types...>>
+    variant_alternative_t<i,variant<Types...>>
   >::type;
 
   auto visitor = VARIANT_DETAIL_NAMESPACE::get_visitor<type>();
@@ -984,7 +978,7 @@ VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<i, variant<Types...>&&>
 
 template<size_t i, class... Types>
 VARIANT_ANNOTATION
-VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<i, const variant<Types...>&>
+VARIANT_DETAIL_NAMESPACE::variant_alternative_reference_t<i, const variant<Types...>&>
   get(const variant<Types...>& v)
 {
   if(i != v.index())
@@ -993,7 +987,7 @@ VARIANT_DETAIL_NAMESPACE::variant_element_reference_t<i, const variant<Types...>
   }
 
   using type = typename std::decay<
-    VARIANT_DETAIL_NAMESPACE::variant_element_t<i,variant<Types...>>
+    variant_alternative_t<i,variant<Types...>>
   >::type;
 
   auto visitor = VARIANT_DETAIL_NAMESPACE::get_visitor<type>();
