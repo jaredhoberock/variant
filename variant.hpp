@@ -135,7 +135,7 @@ using variant_element_t = typename variant_element<i,Types...>::type;
 } // end VARIANT_DETAIL_NAMESPACE
 
 
-static constexpr const size_t variant_not_found = static_cast<size_t>(-1);
+static constexpr const size_t variant_npos = static_cast<size_t>(-1);
 
 
 namespace VARIANT_DETAIL_NAMESPACE
@@ -247,7 +247,7 @@ struct find_type_impl<i,T,T,Types...>
 template<size_t i, typename T>
 struct find_type_impl<i,T>
 {
-  static constexpr const size_t value = variant_not_found;
+  static constexpr const size_t value = variant_npos;
 };
 
 
@@ -262,7 +262,7 @@ template<class T, class... Types>
 struct is_variant_alternative<T,variant<Types...>>
   : std::integral_constant<
       bool,
-      (find_type<T,Types...>::value != variant_not_found)
+      (find_type<T,Types...>::value != variant_npos)
     >
 {};
 
@@ -1014,17 +1014,17 @@ struct find_exactly_one_impl<i,T,U,Types...> : find_exactly_one_impl<i+1,T,Types
 template<size_t i, class T, class... Types>
 struct find_exactly_one_impl<i,T,T,Types...> : std::integral_constant<size_t, i>
 {
-  static_assert(find_exactly_one_impl<i,T,Types...>::value == variant_not_found, "type can only occur once in type list");
+  static_assert(find_exactly_one_impl<i,T,Types...>::value == variant_npos, "type can only occur once in type list");
 };
 
 
 template<size_t i, class T>
-struct find_exactly_one_impl<i,T> : std::integral_constant<size_t, variant_not_found> {};
+struct find_exactly_one_impl<i,T> : std::integral_constant<size_t, variant_npos> {};
 
 template<class T, class... Types>
 struct find_exactly_one : find_exactly_one_impl<0,T,Types...>
 {
-  static_assert(find_exactly_one::value != variant_not_found, "type not found in type list");
+  static_assert(find_exactly_one::value != variant_npos, "type not found in type list");
 };
 
 
