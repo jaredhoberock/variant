@@ -109,6 +109,22 @@ template<typename... Types>
 class variant;
 
 
+template<class T>
+struct variant_size;
+
+template<class... Types>
+struct variant_size<variant<Types...>> : std::integral_constant<std::size_t, sizeof...(Types)> {};
+
+template<class T>
+struct variant_size<const T> : variant_size<T> {};
+
+template<class T>
+struct variant_size<volatile T> : variant_size<T> {};
+
+template<class T>
+struct variant_size<const volatile T> : variant_size<T> {};
+
+
 template<size_t i, typename Variant> struct variant_alternative;
 
 

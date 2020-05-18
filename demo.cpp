@@ -12,18 +12,21 @@ int main()
   assert(get<0>(v1) == 0);
   assert(get<char>(v1) == 0);
   assert(holds_alternative<char>(v1));
+  assert(variant_size<decltype(v1)>::value == 4);
 
   variant<char, int, float, double> v2 = 13;
   assert(v2.index() == 1);
   assert(get<1>(v2) == 13);
   assert(get<int>(v2) == 13);
   assert(holds_alternative<int>(v2));
+  assert(variant_size<decltype(v2)>::value == 4);
 
   variant<char, int, float, double> v3 = 13;
   assert(v3.index() == 1);
   assert(get<1>(v3) == 13);
   assert(get<int>(v3) == 13);
   assert(holds_alternative<int>(v3));
+  assert(variant_size<decltype(v3)>::value == 4);
 
   assert(v2 == v3);
   assert(v1 != v3);
@@ -37,6 +40,7 @@ int main()
   assert(get<4>(v4) == "hello, world!");
   assert(get<std::string>(v4) == "hello, world!");
   assert(holds_alternative<std::string>(v4));
+  assert(variant_size<decltype(v4)>::value == 5);
 
   std::cout << "v4: " << v4 << std::endl;
 
